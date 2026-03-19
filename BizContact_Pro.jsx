@@ -12,12 +12,12 @@ const CONFIG = {
   // 2. 「認証情報を作成」→「OAuthクライアントID」→ 種別: ウェブアプリ
   // 3. 「承認済みのJavaScriptオリジン」に公開URL(例: https://yourname.github.io)を追加
   // 4. 発行されたクライアントIDを下に貼り付ける
-  googleClientId: "YOUR_CLIENT_ID.apps.googleusercontent.com",
+  googleClientId: "50681596217-5t7e05ffbnm0g4dtcsg5uq2e2mqkj23d.apps.googleusercontent.com",
 
   // アクセスを許可するGoogleアカウントのメールアドレス（複数可）
   allowedEmails: [
-    "yourname@gmail.com",
-    // "colleague@company.com",
+    "yuki.yanase@moro-zaki.com",
+    // "colleague@company.com",  ← 追加したい場合はここに追記してpush
   ],
 
   // ── マスターデータ（後から自由に追加・変更可） ────────────────
