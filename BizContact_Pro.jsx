@@ -203,7 +203,9 @@ function LoginScreen({ onLogin, extraAllowedEmails = [] }) {
         client_id: CONFIG.googleClientId,
         callback: (response) => {
           try {
-            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const b64url = response.credential.split('.')[1];
+            const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice((b64url.length % 4 + 2) % 4 || 2);
+            const payload = JSON.parse(atob(b64));
             if (allAllowed.includes(payload.email.toLowerCase())) {
               onLogin(payload);
             } else {
