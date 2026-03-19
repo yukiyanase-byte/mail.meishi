@@ -115,6 +115,7 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({users})).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 連絡先の取得（type=contacts または デフォルト）
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("連絡先");
   if (!sheet || sheet.getLastRow() <= 1)
     return ContentService.createTextOutput(JSON.stringify({contacts:[]}))
@@ -282,7 +283,7 @@ export default function App() {
   };
 
   const [view, setView] = useState(0);
-  const [contacts, setContacts] = useState(SAMPLE_CONTACTS);
+  const [contacts, setContacts] = useState([]);
 
   // Tree state
   const [expandedCompanies, setExpandedCompanies] = useState(new Set(["株式会社テクノロジー", "フィナンシャルグループ"]));
@@ -533,7 +534,7 @@ export default function App() {
     if (!sheetsUrl) { notify("先にApps Script URLを設定・保存してください"); return; }
     if (sheetsAllowedEmails.includes(email)) { notify("すでに追加されています"); return; }
     const updated = [...sheetsAllowedEmails, email];
-    fetch(sheetsUrl, { method:'POST', body: JSON.stringify({ type:'users', users: updated }), headers:{'Content-Type':'application/json'} })
+    fetch(sheetsUrl, { method:'POST', body: JSON.stringify({ type:'users', users: updated }), headers:{'Content-Type':'text/plain'} })
       .then(() => { setSheetsAllowedEmails(updated); setNewUserEmail(""); notify(`✅ ${email} を追加しました`); })
       .catch(() => { setSheetsAllowedEmails(updated); setNewUserEmail(""); notify(`✅ ${email} を追加しました`); });
   };
@@ -541,7 +542,7 @@ export default function App() {
   const removeAllowedUser = (email) => {
     const updated = sheetsAllowedEmails.filter(e => e !== email);
     if (!sheetsUrl) { setSheetsAllowedEmails(updated); return; }
-    fetch(sheetsUrl, { method:'POST', body: JSON.stringify({ type:'users', users: updated }), headers:{'Content-Type':'application/json'} })
+    fetch(sheetsUrl, { method:'POST', body: JSON.stringify({ type:'users', users: updated }), headers:{'Content-Type':'text/plain'} })
       .then(() => { setSheetsAllowedEmails(updated); notify(`✅ ${email} を削除しました`); })
       .catch(() => { setSheetsAllowedEmails(updated); notify(`✅ ${email} を削除しました`); });
   };
@@ -549,9 +550,33 @@ export default function App() {
   const syncToSheets = () => {
     if (!sheetsUrl) { notify("Apps Script URLを入力してください"); return; }
     notify("⏳ 同期中...");
-    fetch(sheetsUrl, { method: 'POST', body: JSON.stringify({ contacts }), headers: { 'Content-Type': 'application/json' } })
-      .then(() => { setLastSync(new Date().toLocaleString('ja-JP')); notify("✅ Google Sheetsと同期しました"); })
-      .catch(() => { setLastSync(new Date().toLocaleString('ja-JP')); notify("✅ 同期しました（デモ）"); });
+    fetch(sheetsUrl, { method: 'POST', body: JSON.stringify({ contacts }), headers: { 'Content-Type': 'text/plain' } })
+      .then(r => r.json())
+      .then(data => { setLastSync(new Date().toLocaleString('ja-JP')); notify(`✅ ${data.updated ?? contacts.length}件をSheetsに同期しました`); })
+      .catch(() => { setLastSync(new Date().toLocaleString('ja-JP')); notify("⚠️ 同期に失敗しました。URLを確認してください"); });
+  };
+
+  const loadFromSheets = () => {
+    if (!sheetsUrl) { notify("Apps Script URLを入力してください"); return; }
+    notify("⏳ Sheetsから読み込み中...");
+    fetch(`${sheetsUrl}?type=contacts`)
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data.contacts) || data.contacts.length === 0) { notify("⚠️ Sheetsにデータがありません"); return; }
+        const loaded = data.contacts.map((c, i) => ({
+          id: c.ID || Date.now() + i,
+          name: c['名前'] || '', company: c['会社名'] || '', title: c['役職'] || '',
+          email: c['メール'] || '', phone: c['電話'] || '', industry: c['業界'] || 'IT',
+          tags: c['タグ'] ? String(c['タグ']).split('/') : [],
+          addedBy: c['担当者'] || '', date: c['登録日'] || '',
+          followUp: c['フォロー日'] || '', address: c['事務所住所'] || '',
+          lastContacted: c['最終連絡'] || null, memo: c['メモ'] || '', emailGroup: []
+        })).filter(c => c.name && c.email);
+        setContacts(loaded);
+        setLastSync(new Date().toLocaleString('ja-JP'));
+        notify(`✅ ${loaded.length}件をSheetsから読み込みました`);
+      })
+      .catch(() => notify("⚠️ 読み込みに失敗しました。URLを確認してください"));
   };
 
   const toggleSort = (col) => { if (sortCol === col) { setSortAsc(a => !a); } else { setSortCol(col); setSortAsc(true); } };
@@ -1084,7 +1109,8 @@ export default function App() {
           <label style={s.label}>Apps Script Web App URL</label>
           <div style={{display:"flex",gap:8}}>
             <input style={{...s.input,flex:1}} placeholder="https://script.google.com/macros/s/xxxxx/exec" value={sheetsUrl} onChange={e => setSheetsUrl(e.target.value)} />
-            <button style={s.btn()} onClick={syncToSheets}>同期実行</button>
+            <button style={s.btn()} onClick={syncToSheets}>⬆ Sheetsへ同期</button>
+            <button style={{...s.btn("secondary")}} onClick={loadFromSheets}>⬇ Sheetsから読込</button>
           </div>
           <div style={{fontSize:11,color:"#475569",marginTop:5}}>Google Apps Scriptでウェブアプリとして公開したURLを入力してください</div>
         </div>
